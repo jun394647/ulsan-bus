@@ -16,8 +16,18 @@ function formatEta(seconds: number): string {
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
 }
 
+/**
+ * 타임존을 한국으로 고정한다.
+ *
+ * getHours()를 쓰면 서버(Vercel은 UTC)와 브라우저(KST)가 9시간 다른 값을 렌더해서
+ * hydration이 깨진다(React #418). 울산 버스 서비스이므로 항상 KST가 맞다.
+ */
 const formatClock = (date: Date) =>
-  `${date.getHours()}시 ${String(date.getMinutes()).padStart(2, '0')}분 기준`
+  `${date.toLocaleTimeString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: 'numeric',
+    minute: '2-digit',
+  })} 기준`
 
 /**
  * 도착정보 표시와 자동 갱신.
