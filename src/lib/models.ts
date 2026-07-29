@@ -28,6 +28,11 @@ export interface Arrival {
   remainingStops: number
   /** 보정된 도착예정 [초]. 3단계 전까지는 seconds와 같다. */
   correctedSeconds: number
+  /**
+   * 종점 이름 = 사실상 "○○ 방면".
+   * 같은 번호가 양방향으로 지나는 정류장에서 어느 쪽인지 알려준다.
+   */
+  destination?: string
 }
 
 export interface ArrivalsResponse {
@@ -35,4 +40,15 @@ export interface ArrivalsResponse {
   arrivals?: Arrival[]
   fetchedAt?: string
   error?: string
+}
+
+/** 정류장을 지나는 노선. 기점·종점이 있어 방면을 알 수 있다. */
+export interface StopRoute {
+  routeId: string
+  routeNo: string
+  routeType?: string
+  /** 기점 */
+  start?: string
+  /** 종점 — 사실상 "○○ 방면" */
+  end?: string
 }

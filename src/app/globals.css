@@ -1,33 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * 디자인 토큰.
+ *
+ * 버스 앱은 걸어가면서, 한 손으로, 밝은 야외에서 본다.
+ * 대비를 충분히 주고 글자를 크게 잡는다. 장식보다 판독성이 먼저다.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #f5f6f8;
+  --surface-strong: #eceef2;
+  --foreground: #14161a;
   --muted: #6b7280;
-  --surface: #f4f5f7;
-  --border: #e4e6eb;
-  /* 곧 도착하는 버스를 강조하는 색 */
-  --urgent: #d92d20;
-}
+  --border: #e3e5ea;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-surface: var(--surface);
-  --color-border: var(--border);
-  --color-urgent: var(--urgent);
+  /* 도착이 임박한 버스. 놓치면 안 되는 정보라 가장 강한 색을 쓴다. */
+  --urgent: #d92d20;
+  --urgent-surface: #fef3f2;
+
+  /* 노선 유형 구분 */
+  --route-normal: #1d6fd8;
+  --route-seat: #0f8b52;
+  --route-express: #d9480f;
+  --route-village: #7c3aed;
+
+  --accent: #1d6fd8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #9ca3af;
-    --surface: #17181b;
-    --border: #2a2c31;
+    --background: #0b0c0e;
+    --surface: #17191d;
+    --surface-strong: #22252b;
+    --foreground: #f1f2f4;
+    --muted: #9aa1ac;
+    --border: #2a2e35;
+
     --urgent: #ff6b5e;
+    --urgent-surface: #2a1614;
+
+    --route-normal: #5da3f5;
+    --route-seat: #46c98a;
+    --route-express: #ff8f5e;
+    --route-village: #a78bfa;
+
+    --accent: #5da3f5;
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-urgent: var(--urgent);
+  --color-urgent-surface: var(--urgent-surface);
+  --color-accent: var(--accent);
 }
 
 body {
@@ -37,9 +67,35 @@ body {
   font-family:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
     "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  /* 목록을 당길 때 배경이 비치지 않도록 */
+  overscroll-behavior-y: none;
 }
 
-/* 숫자를 세로로 정렬해 도착 시간이 흔들리지 않게 한다. */
+/* 숫자를 세로로 정렬해 도착 시간이 갱신될 때 흔들리지 않게 한다. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* 터치 시 파란 하이라이트 제거 — 직접 만든 active 스타일과 겹친다. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes pulse-soft {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* 로딩 스켈레톤 */
+.skeleton {
+  background: var(--surface-strong);
+  border-radius: 0.5rem;
+  animation: pulse-soft 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }

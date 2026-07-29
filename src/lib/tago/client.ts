@@ -216,6 +216,24 @@ export const tago = {
       { revalidate: 0 },
     ),
 
+  /**
+   * 정류소를 지나는 노선 목록. 기점·종점이 함께 오므로 방면 표시에 쓸 수 있다.
+   * 노선 구성은 잘 바뀌지 않으니 길게 캐시한다.
+   */
+  stopRoutes: (cityCode: string | number, nodeId: string) =>
+    call<{
+      routeid: string
+      routeno: number | string
+      routetp?: string
+      startnodenm?: string
+      endnodenm?: string
+    }>(
+      STOP_INFO_BASE,
+      'getSttnThrghRouteList',
+      { cityCode, nodeid: nodeId },
+      { revalidate: STATIC_REVALIDATE },
+    ),
+
   /** 정류소별 도착예정정보. arrtime은 초 단위. */
   arrivals: (cityCode: string | number, nodeId: string) =>
     call<TagoArrival>(
