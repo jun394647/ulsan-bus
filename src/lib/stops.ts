@@ -46,6 +46,41 @@ export function findNearby(
   return result.sort((a, b) => a.distance - b.distance).slice(0, limit)
 }
 
+const CHOSEONG = [
+  'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ',
+  'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+]
+
+const HANGUL_START = 0xac00
+const HANGUL_END = 0xd7a3
+/** 한 초성이 담당하는 음절 수 (중성 21 × 종성 28) */
+const SYLLABLES_PER_CHOSEONG = 588
+
+/** "화정주공" → "ㅎㅈㅈㄱ". 한글이 아닌 문자는 그대로 남긴다. */
+function toChoseong(text: string): string {
+  let result = ''
+  for (const char of text) {
+    const code = char.charCodeAt(0)
+    if (code >= HANGUL_START && code <= HANGUL_END) {
+      result += CHOSEONG[Math.floor((code - HANGUL_START) / SYLLABLES_PER_CHOSEONG)]
+    } else {
+      result += char
+    }
+  }
+  return result
+}
+
+/**
+ * 입력이 초성만으로 되어 있는지.
+ *
+ * 한글 입력 중에는 "ㅎ", "화저" 같은 중간 상태가 계속 들어온다.
+ * 완성된 음절이 하나라도 섞이면 일반 검색으로 넘겨야 한다 —
+ * 그러지 않으면 타이핑하는 동안 결과가 엉뚱하게 튄다.
+ */
+function isChoseongOnly(text: string): boolean {
+  return text.length > 0 && [...text].every((c) => CHOSEONG.includes(c))
+}
+
 /**
  * 이름 또는 번호로 정류소 검색.
  *
@@ -74,6 +109,30 @@ export function searchByName(
       (s) => String(s.nodeno) !== q && String(s.nodeno).includes(q),
     )
     return [...exact, ...partial].slice(0, limit)
+  }
+
+  // 초성만 입력했으면 초성으로 찾는다. "ㅎㅈㅈㄱ" → "화정주공아파트앞"
+  if (isChoseongOnly(q)) {
+    // 일치 강도로 나눈다. "ㅅㅊ"이면 초성이 딱 "ㅅㅊ"인 "시청"이
+    // "새창골"(ㅅㅊㄱ)보다 먼저 나와야 한다.
+    const exact: Stop[] = []
+    const prefix: Stop[] = []
+    const inner: Stop[] = []
+
+    for (const stop of stops) {
+      const cho = toChoseong(stop.name)
+      if (cho === q) exact.push(stop)
+      else if (cho.startsWith(q)) prefix.push(stop)
+      else if (cho.includes(q)) inner.push(stop)
+    }
+
+    // 그룹 안에서는 거리순(위치를 알 때)이나 원래 순서를 유지한다.
+    // 이름 길이로 정렬하면 "태화강역광장"이 "태화강역(1번 정류소)"를 밀어낸다.
+    return [
+      ...withDistance(exact),
+      ...withDistance(prefix),
+      ...withDistance(inner),
+    ].slice(0, limit)
   }
 
   const lowered = q.toLowerCase()
