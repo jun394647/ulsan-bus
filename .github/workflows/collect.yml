@@ -76,3 +76,5 @@ jobs:
             echo "::error::모든 수집이 실패했습니다."
             exit 1
           fi
+
+# 수집 대상은 config/tracked-stops.json 에서 관리한다.
