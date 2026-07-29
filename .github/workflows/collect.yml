@@ -1,0 +1,78 @@
+name: 도착 예측 로그 수집
+
+# GitHub Actions의 cron은 최소 간격이 5분이라 2분 폴링을 직접 걸 수 없다.
+# 대신 워크플로 하나가 몇 시간 동안 살아 있으면서 그 안에서 루프를 돈다.
+# job 최대 실행 시간이 6시간이므로, 하루를 세 구간으로 나눠 이어 붙인다.
+#
+# 시작 시각은 KST 06시 / 12시 / 18시 (GitHub은 UTC로 해석하므로 -9시간).
+# GitHub의 스케줄 트리거는 수 분에서 수십 분 늦게 뜨는 일이 흔하다.
+# 앞쪽이 조금 비는 것은 감수한다 — 정확한 시작보다 꾸준한 수집이 중요하다.
+on:
+  schedule:
+    - cron: '0 21 * * *' # KST 06:00
+    - cron: '0 3 * * *' # KST 12:00
+    - cron: '0 9 * * *' # KST 18:00
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: '수집을 유지할 시간(분)'
+        required: false
+        default: '30'
+
+concurrency:
+  # 앞 구간이 아직 돌고 있으면 중복 수집으로 트래픽을 두 배로 쓰게 된다.
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    # 6시간 상한에 걸려 강제 종료되지 않도록 여유를 둔다.
+    timeout-minutes: 355
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 수집 루프
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          # 수동 실행이면 입력값을, 스케줄 실행이면 구간 전체(350분)를 쓴다.
+          RUN_MINUTES: ${{ github.event.inputs.minutes || '350' }}
+        run: |
+          set -u
+          END_TS=$(( $(date +%s) + RUN_MINUTES * 60 ))
+          ROUND=0
+          FAILURES=0
+
+          while [ "$(date +%s)" -lt "$END_TS" ]; do
+            ROUND=$((ROUND + 1))
+
+            # 한 번 실패했다고 루프를 멈추면 남은 시간을 통째로 잃는다.
+            # 외부 API는 간헐적으로 죽으므로 실패를 세기만 하고 계속 간다.
+            if ! pnpm collect; then
+              FAILURES=$((FAILURES + 1))
+              echo "::warning::수집 실패 (누적 ${FAILURES}회)"
+            fi
+
+            # 남은 시간이 한 주기도 안 되면 더 자지 않고 끝낸다.
+            if [ "$(( $(date +%s) + 120 ))" -ge "$END_TS" ]; then break; fi
+            sleep 120
+          done
+
+          echo "총 ${ROUND}회 수집, 실패 ${FAILURES}회"
+
+          # 전부 실패했다면 설정이 잘못된 것이다. 조용히 넘어가면 안 된다.
+          if [ "$ROUND" -gt 0 ] && [ "$FAILURES" -eq "$ROUND" ]; then
+            echo "::error::모든 수집이 실패했습니다."
+            exit 1
+          fi

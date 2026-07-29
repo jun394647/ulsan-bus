@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #6b7280;
+  --surface: #f4f5f7;
+  --border: #e4e6eb;
+  /* 곧 도착하는 버스를 강조하는 색 */
+  --urgent: #d92d20;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-urgent: var(--urgent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted: #9ca3af;
+    --surface: #17181b;
+    --border: #2a2c31;
+    --urgent: #ff6b5e;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  /* 한글이 주 콘텐츠다. 시스템 한글 폰트를 우선한다. */
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+    "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+}
+
+/* 숫자를 세로로 정렬해 도착 시간이 흔들리지 않게 한다. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
