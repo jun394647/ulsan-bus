@@ -12,7 +12,8 @@
     "build:stops": "node --env-file-if-exists=.env.local --import tsx scripts/build-stops.ts",
     "db:setup": "node --env-file-if-exists=.env.local --import tsx scripts/db-setup.ts",
     "collect": "node --env-file-if-exists=.env.local --import tsx scripts/collect-once.ts",
-    "analyze": "node --env-file-if-exists=.env.local --import tsx scripts/analyze.ts"
+    "analyze": "node --env-file-if-exists=.env.local --import tsx scripts/analyze.ts",
+    "warm:routes": "node --env-file-if-exists=.env.local --import tsx scripts/warm-routes.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.10.1",
