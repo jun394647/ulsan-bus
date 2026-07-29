@@ -46,6 +46,30 @@ CREATE INDEX IF NOT EXISTS idx_observations_latest
 CREATE INDEX IF NOT EXISTS idx_observations_observed_at
   ON arrival_observations (observed_at DESC);
 
+-- 정류장별 경유노선.
+--
+-- TAGO의 getSttnThrghRouteList 응답을 그대로 담는다. 노선 구성은 개편이 있을 때만
+-- 바뀌므로 사실상 정적인 데이터인데, 매번 API를 부르면 길찾기 첫 조회가 16초까지
+-- 걸린다(정류장 여러 곳의 경유노선을 동시에 필요로 하기 때문).
+--
+-- Next.js fetch 캐시로도 되지만 그건 첫 요청마다 다시 미스가 난다.
+-- DB에 두면 한 번 받은 정류장은 모든 요청이 공유한다.
+CREATE TABLE IF NOT EXISTS stop_routes (
+  node_id     text NOT NULL,
+  route_id    text NOT NULL,
+  route_no    text NOT NULL,
+  route_type  text,
+  start_name  text,
+  -- 종점 = 사실상 "○○ 방면". 방면 표시의 근거 데이터다.
+  end_name    text,
+  fetched_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (node_id, route_id)
+);
+
+-- "이 정류장 것을 언제 받았나"를 함께 본다.
+CREATE INDEX IF NOT EXISTS idx_stop_routes_node
+  ON stop_routes (node_id, fetched_at);
+
 -- 수집 실행 기록. 크론이 실제로 돌고 있는지, 몇 건을 썼는지 확인용.
 -- API 호출량이 한도에 걸리는지 여기서 본다.
 CREATE TABLE IF NOT EXISTS collection_runs (

@@ -2,6 +2,9 @@ import Link from 'next/link'
 import type { NearbyStop, Stop } from '@/lib/models'
 import { formatDistance, walkingMinutes } from '@/lib/geo'
 
+/** 이 거리를 넘으면 걸어갈 곳이 아니므로 도보 시간을 표시하지 않는다. */
+const WALKABLE_METERS = 1500
+
 export function SectionTitle({
   children,
   action,
@@ -59,9 +62,17 @@ export function StopList({
               {distance !== undefined && (
                 <div className="tabular shrink-0 text-right text-sm">
                   <div className="font-medium">{formatDistance(distance)}</div>
-                  <div className="mt-0.5 text-[var(--color-muted)]">
-                    도보 {walkingMinutes(distance)}분
-                  </div>
+                  {/*
+                    걸어갈 만한 거리에서만 도보 시간을 보여준다.
+                    이름 검색은 도시 반대편 정류장도 잡아서, 그때 "도보 116분"이
+                    뜨면 정보가 아니라 잡음이다. 거리 자체는 어느 쪽 정류장인지
+                    가늠하는 데 여전히 쓸모가 있으므로 남긴다.
+                  */}
+                  {distance <= WALKABLE_METERS && (
+                    <div className="mt-0.5 text-[var(--color-muted)]">
+                      도보 {walkingMinutes(distance)}분
+                    </div>
+                  )}
                 </div>
               )}
             </Link>
