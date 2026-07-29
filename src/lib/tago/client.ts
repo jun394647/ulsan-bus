@@ -231,7 +231,12 @@ export const tago = {
       STOP_INFO_BASE,
       'getSttnThrghRouteList',
       { cityCode, nodeid: nodeId },
-      { revalidate: STATIC_REVALIDATE },
+      {
+        revalidate: STATIC_REVALIDATE,
+        // 방면 표시는 있으면 좋은 정보이지 도착시간처럼 필수는 아니다.
+        // 이걸 오래 기다리다 도착정보까지 늦게 뜨는 편이 더 나쁘다.
+        timeoutMs: 4000,
+      },
     ),
 
   /** 정류소별 도착예정정보. arrtime은 초 단위. */

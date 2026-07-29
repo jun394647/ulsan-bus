@@ -11,15 +11,20 @@ import { findNearby, searchByName } from '@/lib/stops'
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams
 
-  const lat = Number(params.get('lat'))
-  const lng = Number(params.get('lng'))
-  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng)
+  // Number(null)은 0이고 isFinite(0)은 true다. 파라미터가 없을 때 그대로 쓰면
+  // 위경도 (0, 0) — 아프리카 서쪽 바다 — 기준으로 거리를 계산해 버린다.
+  const lat = toCoord(params.get('lat'))
+  const lng = toCoord(params.get('lng'))
+  const hasCoords = lat !== null && lng !== null
 
   const query = params.get('q')
   if (query) {
     // 좌표를 함께 받으면 동명 정류소를 가까운 순으로 정렬해 준다.
     return NextResponse.json({
-      stops: searchByName(query, hasCoords ? { near: { lat, lng } } : {}),
+      stops: searchByName(
+        query,
+        hasCoords ? { near: { lat, lng } } : {},
+      ),
     })
   }
 
@@ -36,4 +41,11 @@ export async function GET(request: Request) {
   return NextResponse.json({
     stops: findNearby(lat, lng, { limit, maxDistance }),
   })
+}
+
+/** 빈 값·비숫자를 null로 만든다. Number(null) === 0 함정을 피하기 위함. */
+function toCoord(value: string | null): number | null {
+  if (value === null || value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }

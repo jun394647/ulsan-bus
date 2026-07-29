@@ -31,14 +31,16 @@ export async function GET(request: Request) {
 
   // ── 출발지 후보
   const from = params.get('from')
-  const lat = Number(params.get('lat'))
-  const lng = Number(params.get('lng'))
+  // Number(null)은 0이라 isFinite를 통과한다. 좌표가 없을 때 (0, 0)으로
+  // 근처 정류장을 찾으면 엉뚱한 결과가 나오므로 null로 걸러낸다.
+  const lat = toCoord(params.get('lat'))
+  const lng = toCoord(params.get('lng'))
 
   let originStops: (Stop & { distance?: number })[]
 
   if (from) {
     originStops = resolveStops(from)
-  } else if (Number.isFinite(lat) && Number.isFinite(lng)) {
+  } else if (lat !== null && lng !== null) {
     // 걸어갈 만한 범위의 정류장을 모두 후보로 둔다.
     // 조금 더 걸어서 직통 버스를 타는 게 나은 경우가 많다.
     originStops = findNearby(lat, lng, { limit: 4, maxDistance: 700 })
@@ -70,6 +72,13 @@ export async function GET(request: Request) {
       { status: 500 },
     )
   }
+}
+
+/** 빈 값·비숫자를 null로 만든다. Number(null) === 0 함정을 피하기 위함. */
+function toCoord(value: string | null): number | null {
+  if (value === null || value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 /** nodeid면 그 정류장 하나, 이름이면 동명 정류장을 모두 후보로 반환한다. */
