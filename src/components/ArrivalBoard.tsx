@@ -29,15 +29,19 @@ const formatClock = (date: Date) =>
 export function ArrivalBoard({
   stop,
   initialArrivals,
+  initialObservedAt,
   initialError,
 }: {
   stop: Stop
   initialArrivals: Arrival[]
+  initialObservedAt?: string
   initialError?: string
 }) {
   const [arrivals, setArrivals] = useState(initialArrivals)
   const [error, setError] = useState<string | null>(initialError ?? null)
-  const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(
+    initialObservedAt ? new Date(initialObservedAt) : null,
+  )
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // 응답이 느려 갱신이 겹칠 수 있다. 진행 중이면 건너뛴다.

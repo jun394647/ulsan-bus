@@ -26,11 +26,13 @@ export async function GET(
   }
 
   try {
-    const arrivals = await getArrivals(nodeid)
+    const result = await getArrivals(nodeid)
     return NextResponse.json({
       stop,
-      arrivals,
-      fetchedAt: new Date().toISOString(),
+      arrivals: result.arrivals,
+      // 응답을 만든 시각이 아니라 값을 실제로 관측한 시각을 준다.
+      // 캐시된 값이면 최대 100초 전일 수 있고, 그걸 화면에 그대로 보여줘야 한다.
+      fetchedAt: result.observedAt.toISOString(),
     })
   } catch (error) {
     // 외부 API 장애와 우리 쪽 버그를 구분해서 알려준다.

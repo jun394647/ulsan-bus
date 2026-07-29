@@ -76,6 +76,7 @@ export async function collect(): Promise<CollectionResult> {
             route_no: String(row.routeno),
             arrtime: Number(row.arrtime),
             prev_stops: Number(row.arrprevstationcnt),
+            vehicle_type: row.vehicletp ?? null,
             observed_at: observedAt,
           }))
 

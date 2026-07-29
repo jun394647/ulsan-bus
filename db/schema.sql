@@ -31,9 +31,16 @@ CREATE TABLE IF NOT EXISTS arrival_observations (
   observed_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- 저상버스 여부. 화면에 표시하는 정보라, 캐시된 관측을 그대로 보여주려면 함께 남겨야 한다.
+ALTER TABLE arrival_observations ADD COLUMN IF NOT EXISTS vehicle_type text;
+
 -- 궤적 재구성과 잔차 집계가 모두 (정류장, 노선, 시간) 순으로 훑는다.
 CREATE INDEX IF NOT EXISTS idx_observations_trace
   ON arrival_observations (node_id, route_id, observed_at);
+
+-- 캐시 조회는 "이 정류장의 가장 최근 관측"을 찾는다.
+CREATE INDEX IF NOT EXISTS idx_observations_latest
+  ON arrival_observations (node_id, observed_at DESC);
 
 -- 최근 수집 상태를 빠르게 보기 위한 인덱스.
 CREATE INDEX IF NOT EXISTS idx_observations_observed_at

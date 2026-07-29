@@ -49,16 +49,26 @@ async function ArrivalsSection({ stop }: { stop: Stop }) {
   // try는 데이터 조회만 감싼다. JSX를 try 안에서 만들면 렌더 단계의 오류가
   // 여기서 잡히는 것처럼 보이지만 실제로는 잡히지 않는다.
   let arrivals: Arrival[] = []
+  let observedAt: string | undefined
   let error: string | undefined
 
   try {
-    arrivals = await getArrivals(stop.nodeid)
+    const result = await getArrivals(stop.nodeid)
+    arrivals = result.arrivals
+    observedAt = result.observedAt.toISOString()
   } catch (caught) {
     console.error('[stop page]', stop.nodeid, caught)
     error = '도착정보를 가져오지 못했습니다. 잠시 후 새로고침해 주세요.'
   }
 
-  return <ArrivalBoard stop={stop} initialArrivals={arrivals} initialError={error} />
+  return (
+    <ArrivalBoard
+      stop={stop}
+      initialArrivals={arrivals}
+      initialObservedAt={observedAt}
+      initialError={error}
+    />
+  )
 }
 
 function ArrivalsFallback() {
