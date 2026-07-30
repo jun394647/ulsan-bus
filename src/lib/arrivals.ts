@@ -89,12 +89,24 @@ async function readRecent(nodeId: string): Promise<ArrivalsResult | null> {
     if (rows.length === 0) return null
 
     const observedAt = rows[0].observed_at
-    const elapsed = (Date.now() - observedAt.getTime()) / 1000
 
+    /*
+     * 경과 시간을 차감하지 않는다.
+     *
+     * 처음에는 "관측 후 흐른 만큼 빼면 지금 기준이 된다"고 보고 차감했다.
+     * 그런데 실측해 보니 TAGO는 약 2분마다 한 번씩만 arrtime을 갱신한다
+     * (25초 간격으로 8번 조회했을 때 123초 지점에서 전체가 한꺼번에 바뀌었다).
+     *
+     * 즉 우리가 받은 값은 이미 0~120초 낡은 상태다. TAGO가 언제 계산했는지는
+     * 알 수 없으므로, 여기서 또 빼면 이중으로 줄어들어 실제보다 짧게 표시된다.
+     * 짧게 표시하는 오류는 버스를 놓치게 만들어 길게 표시하는 것보다 나쁘다.
+     *
+     * 그래서 원본을 그대로 쓰고, 신선도는 "몇 시 기준"으로 화면에 밝힌다.
+     * 정확도는 3단계에서 실측 잔차로 보정한다 — 추측으로 깎지 않는다.
+     */
     const arrivals = rows
       .map((row) => {
-        // 관측 이후 흐른 만큼 빼야 지금 기준의 남은 시간이 된다.
-        const seconds = Math.round(row.arrtime - elapsed)
+        const seconds = row.arrtime
         return toArrival({
           routeId: row.route_id,
           routeNo: row.route_no,
@@ -103,8 +115,12 @@ async function readRecent(nodeId: string): Promise<ArrivalsResult | null> {
           vehicleType: row.vehicle_type ?? undefined,
         })
       })
-      // 이미 지나간 버스는 뺀다.
-      .filter((arrival) => arrival.seconds > -30)
+      // 관측이 낡은 동안 이미 지나갔을 버스는 뺀다.
+      // 캐시 나이(최대 45초)보다 남은 시간이 짧으면 도착했다고 본다.
+      .filter(
+        (arrival) =>
+          arrival.seconds > (Date.now() - observedAt.getTime()) / 1000 - 30,
+      )
       .sort((a, b) => a.correctedSeconds - b.correctedSeconds)
 
     return { arrivals, observedAt, fromCache: true }

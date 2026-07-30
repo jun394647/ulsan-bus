@@ -71,6 +71,23 @@ function toChoseong(text: string): string {
 }
 
 /**
+ * 괄호 안 부가 설명을 뗀 이름. "태화강역(1번 정류소)" → "태화강역"
+ *
+ * 검색 순위를 매길 때 쓴다. 그냥 이름 길이로 정렬하면 괄호 설명이 붙은
+ * "태화강역(1번 정류소)"이 "태화강국가정원 로터리"보다 길어서 뒤로 밀린다.
+ */
+const coreName = (name: string) => name.replace(/\([^)]*\)/g, '').trim()
+
+/**
+ * 검색어와의 관련성 순으로 정렬한다.
+ *
+ * "태화강"을 쳤을 때 "태화강역"이 "태화강국가정원 동강병원"보다 먼저 나와야 한다.
+ * 핵심 이름이 짧다는 것은 검색어가 그 정류장을 거의 그대로 가리킨다는 뜻이다.
+ */
+const byRelevance = (a: Stop, b: Stop) =>
+  coreName(a.name).length - coreName(b.name).length
+
+/**
  * 입력이 초성만으로 되어 있는지.
  *
  * 한글 입력 중에는 "ㅎ", "화저" 같은 중간 상태가 계속 들어온다.
@@ -126,8 +143,11 @@ export function searchByName(
       else if (cho.includes(q)) inner.push(stop)
     }
 
-    // 그룹 안에서는 거리순(위치를 알 때)이나 원래 순서를 유지한다.
-    // 이름 길이로 정렬하면 "태화강역광장"이 "태화강역(1번 정류소)"를 밀어낸다.
+    // 그룹 안에서는 관련성(핵심 이름이 짧은 순)으로, 위치를 알면 거리순으로.
+    exact.sort(byRelevance)
+    prefix.sort(byRelevance)
+    inner.sort(byRelevance)
+
     return [
       ...withDistance(exact),
       ...withDistance(prefix),
@@ -136,15 +156,27 @@ export function searchByName(
   }
 
   const lowered = q.toLowerCase()
+  const exact: Stop[] = []
   const startsWith: Stop[] = []
   const contains: Stop[] = []
 
   for (const stop of stops) {
     const name = stop.name.toLowerCase()
-    if (name.startsWith(lowered)) startsWith.push(stop)
+    // 괄호 설명을 뗀 이름이 검색어와 같으면 가장 정확한 결과다.
+    // "태화강역"을 쳤을 때 "태화강역(1번 정류소)"이 여기 걸린다.
+    if (coreName(name) === lowered) exact.push(stop)
+    else if (name.startsWith(lowered)) startsWith.push(stop)
     else if (name.includes(lowered)) contains.push(stop)
   }
 
-  // 이름 일치도를 거리보다 우선한다. 정확히 시작하는 이름이 먼저다.
-  return [...withDistance(startsWith), ...withDistance(contains)].slice(0, limit)
+  exact.sort(byRelevance)
+  startsWith.sort(byRelevance)
+  contains.sort(byRelevance)
+
+  // 일치 강도를 거리보다 우선한다.
+  return [
+    ...withDistance(exact),
+    ...withDistance(startsWith),
+    ...withDistance(contains),
+  ].slice(0, limit)
 }
