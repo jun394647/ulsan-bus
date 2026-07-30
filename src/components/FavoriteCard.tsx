@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Arrival, ArrivalsResponse, Stop } from '@/lib/models'
 import { RouteBadge } from './RouteBadge'
+import { shortenPlace } from '@/lib/place'
 
 /**
  * 즐겨찾기 정류장 카드. 다음 버스 두 대를 카드 안에서 바로 보여준다.
@@ -102,7 +103,7 @@ export function FavoriteCard({ stop }: { stop: Stop }) {
               />
               {arrival.destination && (
                 <span className="truncate text-[var(--color-muted)]">
-                  {arrival.destination} 방면
+                  {shortenPlace(arrival.destination)} 방면
                 </span>
               )}
               <span

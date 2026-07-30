@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { Arrival, Stop, StopRoute } from '@/lib/models'
 import { formatDistance, walkingMinutes } from '@/lib/geo'
 import { RouteBadge, RouteTypeLabel } from './RouteBadge'
+import { shortenPlace } from '@/lib/place'
 
 interface JourneyOption {
   route: StopRoute
@@ -189,7 +190,7 @@ function Results({ state }: { state: State }) {
 
               {option.route.end && (
                 <div className="mt-1 text-sm text-[var(--color-muted)]">
-                  {option.route.end} 방면
+                  {shortenPlace(option.route.end)} 방면
                 </div>
               )}
 

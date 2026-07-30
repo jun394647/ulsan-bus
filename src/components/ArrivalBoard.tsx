@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Arrival, ArrivalsResponse, Stop, StopRoute } from '@/lib/models'
 import { RouteBadge, RouteTypeLabel } from './RouteBadge'
 import { DEFAULT_LEAD_SECONDS, useArrivalAlerts } from '@/lib/notify'
+import { shortenPlace } from '@/lib/place'
 import { ShareButton } from './ShareButton'
 
 /** 자동 갱신 간격. 트래픽 한도(10,000회/일)와 체감 신선도의 절충값. */
@@ -245,15 +246,19 @@ function ArrivalCard({
         </div>
 
         <div className="mt-1 flex items-center gap-1.5 text-sm text-[var(--color-muted)]">
-          <span className="tabular">
+          {/* 남은 정류장 수는 줄바꿈되지 않게 고정하고, 길이가 들쭉날쭉한
+              방면 이름만 잘린다. 반대로 두면 "5개 정류장 / 전"처럼 깨진다. */}
+          <span className="tabular shrink-0">
             {arrival.remainingStops <= 0
               ? '접근 중'
               : `${arrival.remainingStops}개 정류장 전`}
           </span>
           {arrival.destination && (
             <>
-              <span aria-hidden>·</span>
-              <span className="truncate">{arrival.destination} 방면</span>
+              <span className="shrink-0" aria-hidden>
+                ·
+              </span>
+              <span className="truncate">{shortenPlace(arrival.destination)} 방면</span>
             </>
           )}
         </div>
