@@ -12,10 +12,13 @@ import { TagoError } from '@/lib/tago/client'
  * 클라이언트는 이전 값을 유지한 채 갱신하도록 만든다.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ nodeid: string }> },
 ) {
   const { nodeid } = await params
+  // fresh=1이면 캐시를 건너뛴다. 클라이언트가 첫 화면 직후 정확한 값으로
+  // 갈아끼울 때 쓴다 — 캐시는 최대 45초 뒤처질 수 있다.
+  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
 
   const stop = getStop(nodeid)
   if (!stop) {
@@ -26,10 +29,11 @@ export async function GET(
   }
 
   try {
-    const result = await getArrivals(nodeid)
+    const result = await getArrivals(nodeid, { fresh })
     return NextResponse.json({
       stop,
       arrivals: result.arrivals,
+      fromCache: result.fromCache,
       // 응답을 만든 시각이 아니라 값을 실제로 관측한 시각을 준다.
       // 캐시된 값이면 최대 100초 전일 수 있고, 그걸 화면에 그대로 보여줘야 한다.
       fetchedAt: result.observedAt.toISOString(),

@@ -77,8 +77,13 @@ export default function StopMap({ center, stops }: Props) {
     const map = L.map(containerRef.current, {
       center: [center.lat, center.lng],
       zoom: 16,
-      // 지도가 페이지 스크롤을 가로채면 목록으로 내려가기가 어려워진다.
-      scrollWheelZoom: false,
+      // 휠·핀치·더블탭 모두 바로 줌이 되게 한다.
+      scrollWheelZoom: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      // 휠 줌이 너무 민감하면 페이지를 스크롤하려다 확대돼 버린다.
+      wheelPxPerZoomLevel: 120,
+      zoomSnap: 0.5,
       attributionControl: true,
     })
 
@@ -134,7 +139,7 @@ export default function StopMap({ center, stops }: Props) {
   return (
     <div
       ref={containerRef}
-      className="h-[260px] w-full overflow-hidden rounded-xl border border-[var(--color-border)]"
+      className="h-[300px] w-full overflow-hidden rounded-xl border border-[var(--color-border)]"
       // Leaflet의 기본 z-index가 높아 헤더 위로 올라오는 것을 막는다.
       style={{ zIndex: 0 }}
     />

@@ -6,12 +6,13 @@ import type { NearbyStop, Stop } from '@/lib/models'
 import { useFavorites } from '@/lib/favorites'
 import { useRecentStops } from '@/lib/recent'
 import { SectionTitle, StopList } from './StopList'
+import { FavoriteCard } from './FavoriteCard'
 
 // Leaflet은 window에 의존해 서버에서 평가될 수 없다.
 // 지도 번들(약 150KB)이 첫 로드를 늦추지 않는 효과도 있다.
 const StopMap = dynamic(() => import('./StopMap'), {
   ssr: false,
-  loading: () => <div className="skeleton h-[260px] w-full" />,
+  loading: () => <div className="skeleton h-[300px] w-full" />,
 })
 
 type LocationState =
@@ -148,7 +149,15 @@ function FavoriteSection() {
   return (
     <>
       <SectionTitle>즐겨찾기</SectionTitle>
-      <StopList stops={favorites} />
+      {/* 다른 목록과 달리 도착시간까지 카드 안에 담는다. 매일 보는 정류장이라
+          여기서 확인이 끝나야 한다. */}
+      <ul className="flex flex-col gap-2 px-4">
+        {favorites.map((stop) => (
+          <li key={stop.nodeid}>
+            <FavoriteCard stop={stop} />
+          </li>
+        ))}
+      </ul>
     </>
   )
 }

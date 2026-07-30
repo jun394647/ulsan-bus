@@ -24,10 +24,16 @@ export type { Arrival }
 const ULSAN_CITY_CODE = 26
 
 /**
- * 이보다 오래된 관측은 쓰지 않는다.
- * 수집 주기(2분)보다 조금 짧게 잡아, 수집이 멈췄을 때 낡은 값을 계속 보여주지 않도록 한다.
+ * 캐시를 쓸 수 있는 최대 나이.
+ *
+ * 짧게 잡는 이유: 관측 시각으로부터 경과한 만큼 arrtime을 빼서 쓰지만,
+ * 버스 예측은 선형이 아니다. 100초 전 "5분 후"가 지금 "2분 후"로 갱신됐을 수 있는데
+ * 단순 차감은 그 갱신을 놓친다. 결과적으로 화면이 실제보다 뒤처져 보인다.
+ *
+ * 그래서 캐시는 "첫 화면을 즉시 띄우는 용도"로만 쓰고, 곧바로 실시간 값으로
+ * 갈아끼운다(fetchFresh). 이 값은 그 즉시성의 허용 오차다.
  */
-const CACHE_MAX_AGE_SECONDS = 100
+const CACHE_MAX_AGE_SECONDS = 45
 
 export interface ArrivalsResult {
   arrivals: Arrival[]
@@ -46,9 +52,18 @@ interface CachedRow {
   observed_at: Date
 }
 
-export async function getArrivals(nodeId: string): Promise<ArrivalsResult> {
-  const cached = await readRecent(nodeId)
-  if (cached) return cached
+/**
+ * @param options.fresh 캐시를 건너뛰고 API에서 직접 받는다.
+ *   클라이언트가 첫 화면을 띄운 직후 정확한 값으로 갱신할 때 쓴다.
+ */
+export async function getArrivals(
+  nodeId: string,
+  options: { fresh?: boolean } = {},
+): Promise<ArrivalsResult> {
+  if (!options.fresh) {
+    const cached = await readRecent(nodeId)
+    if (cached) return cached
+  }
 
   return fetchFresh(nodeId)
 }
