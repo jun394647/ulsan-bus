@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { TabBar } from '@/components/TabBar'
 
 export const metadata: Metadata = {
   title: '울산버스',
@@ -24,7 +25,10 @@ export default function RootLayout({
     // 한글 폰트는 시스템 폰트를 쓴다. Geist는 한글 글리프가 없어서
     // 어차피 폴백되는데, 웹폰트 로딩만 추가된다.
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <TabBar />
+      </body>
     </html>
   )
 }

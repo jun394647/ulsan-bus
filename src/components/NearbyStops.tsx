@@ -36,6 +36,10 @@ export function NearbyStops() {
   // 검색할 때도 좌표를 넘겨 동명 정류소를 거리순으로 보여준다.
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
 
+  // 지도는 기본으로 펼치되 접을 수 있게 한다. 목록만 보려는 사람에게는
+  // 300px이 스크롤 부담이고, 지도 타일 로딩도 매번 일어난다.
+  const [mapOpen, setMapOpen] = useState(true)
+
   const handlePosition = useCallback(async ({ coords }: GeolocationPosition) => {
     setCoords({ lat: coords.latitude, lng: coords.longitude })
 
@@ -105,7 +109,7 @@ export function NearbyStops() {
   const isSearching = query.trim().length > 0
 
   return (
-    <div className="flex flex-1 flex-col pb-10">
+    <div className="flex flex-1 flex-col pb-6">
       <div className="px-4 pb-1">
         <input
           type="search"
@@ -128,12 +132,30 @@ export function NearbyStops() {
         <>
           <FavoriteSection />
           <RecentSection />
-          <SectionTitle>가까운 정류장</SectionTitle>
-          {coords && location.status === 'ready' && location.stops.length > 0 && (
-            <div className="px-4 pb-3">
-              <StopMap center={coords} stops={location.stops} />
-            </div>
-          )}
+          <SectionTitle
+            action={
+              coords && location.status === 'ready' && location.stops.length > 0 ? (
+                <button
+                  onClick={() => setMapOpen((open) => !open)}
+                  className="text-sm font-medium text-[var(--color-accent)]"
+                >
+                  {mapOpen ? '지도 접기' : '지도 보기'}
+                </button>
+              ) : undefined
+            }
+          >
+            가까운 정류장
+          </SectionTitle>
+
+          {mapOpen &&
+            coords &&
+            location.status === 'ready' &&
+            location.stops.length > 0 && (
+              <div className="px-4 pb-3">
+                <StopMap center={coords} stops={location.stops} />
+              </div>
+            )}
+
           <NearbyContent state={location} onRetry={locate} />
         </>
       )}

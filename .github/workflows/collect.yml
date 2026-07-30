@@ -48,6 +48,7 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           # 수동 실행이면 입력값을, 스케줄 실행이면 구간 전체(350분)를 쓴다.
           RUN_MINUTES: ${{ github.event.inputs.minutes || '350' }}
+          APP_URL: https://ulsan-bus.vercel.app
         run: |
           set -u
           END_TS=$(( $(date +%s) + RUN_MINUTES * 60 ))
@@ -63,6 +64,13 @@ jobs:
               FAILURES=$((FAILURES + 1))
               echo "::warning::수집 실패 (누적 ${FAILURES}회)"
             fi
+
+            # 배포된 앱도 함께 깨워 둔다.
+            # 웜 상태에서는 50ms로 응답하지만 콜드 스타트가 걸리면 1~3초로 늘어난다.
+            # 정류장 앞에서 급하게 켜는 앱이라 그 차이가 크게 느껴진다.
+            # 수집이 어차피 2분마다 도니 핑 한 번을 얹는 비용은 없다.
+            curl -s -o /dev/null -m 10 "$APP_URL" || true
+            curl -s -o /dev/null -m 10 "$APP_URL/journey" || true
 
             # 남은 시간이 한 주기도 안 되면 더 자지 않고 끝낸다.
             if [ "$(( $(date +%s) + 120 ))" -ge "$END_TS" ]; then break; fi

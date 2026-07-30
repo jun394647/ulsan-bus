@@ -84,7 +84,7 @@ export function JourneyPlanner() {
   )
 
   return (
-    <div className="flex flex-1 flex-col pb-10">
+    <div className="flex flex-1 flex-col pb-6">
       <form onSubmit={search} className="flex gap-2 px-4">
         <input
           value={destination}

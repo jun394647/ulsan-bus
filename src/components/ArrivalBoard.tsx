@@ -12,14 +12,18 @@ const REFRESH_MS = 30_000
 /** 이 시간 안에 오는 버스는 강조한다. 지금 뛰어야 할지 판단하는 기준. */
 const URGENT_SECONDS = 180
 
-function formatEta(seconds: number): string {
-  if (!Number.isFinite(seconds)) return '—'
-  if (seconds < 60) return '곧 도착'
+/**
+ * 도착시간을 숫자와 단위로 나눈다.
+ * 숫자만 키워야 한 눈에 읽힌다 — "3분"에서 중요한 건 3이다.
+ */
+function splitEta(seconds: number): { value: string; unit?: string } {
+  if (!Number.isFinite(seconds)) return { value: '—' }
+  if (seconds < 60) return { value: '곧 도착' }
 
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}분`
+  if (minutes < 60) return { value: String(minutes), unit: '분' }
 
-  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
+  return { value: String(Math.floor(minutes / 60)), unit: `시간 ${minutes % 60}분` }
 }
 
 /**
@@ -117,7 +121,7 @@ export function ArrivalBoard({
   const idleRoutes = routes.filter((r) => !arrivingIds.has(r.routeId))
 
   return (
-    <div className="flex flex-1 flex-col pb-10">
+    <div className="flex flex-1 flex-col pb-6">
       <div className="flex items-center justify-between px-4 py-2.5 text-sm text-[var(--color-muted)]">
         <span className="tabular">
           {fetchedAt ? `${formatClock(fetchedAt)} 기준` : '불러오는 중…'}
@@ -215,6 +219,7 @@ function ArrivalCard({
   const isUrgent = arrival.correctedSeconds < URGENT_SECONDS
   // 이미 임박한 버스에 알림을 걸 이유가 없다.
   const canAlert = arrival.correctedSeconds > DEFAULT_LEAD_SECONDS
+  const eta = splitEta(arrival.correctedSeconds)
 
   return (
     <li
@@ -256,10 +261,13 @@ function ArrivalCard({
 
       <div className="flex shrink-0 items-center gap-1">
         <div
-          className="tabular text-right text-2xl font-bold"
+          className="tabular text-right leading-none"
           style={{ color: isUrgent ? 'var(--urgent)' : 'var(--foreground)' }}
         >
-          {formatEta(arrival.correctedSeconds)}
+          <span className={eta.unit ? 'text-3xl font-bold' : 'text-xl font-bold'}>
+            {eta.value}
+          </span>
+          {eta.unit && <span className="ml-0.5 text-sm font-semibold">{eta.unit}</span>}
         </div>
 
         {(canAlert || watched) && (
