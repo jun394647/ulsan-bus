@@ -12,8 +12,11 @@ import { createLocalStore } from './local-store'
  */
 const store = createLocalStore<Stop>('ulsan-bus:recent')
 
-/** 너무 길면 목록이 오히려 방해가 된다. */
-const MAX_ITEMS = 5
+/**
+ * 너무 길면 목록이 오히려 방해가 된다. 홈에는 즐겨찾기와 가까운 정류장도
+ * 함께 놓이므로, 최근 목록이 화면을 밀어내지 않을 만큼만 남긴다.
+ */
+const MAX_ITEMS = 3
 
 export function useRecentStops() {
   const recent = store.useValue()
