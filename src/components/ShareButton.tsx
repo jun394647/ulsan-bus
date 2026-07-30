@@ -22,9 +22,11 @@ export function ShareButton({ stop }: { stop: Stop }) {
       try {
         await navigator.share({ title, text: `${title} 버스 도착 정보`, url })
         return
-      } catch {
-        // 사용자가 공유 시트를 닫은 경우다. 클립보드로 넘어갈 필요는 없다.
-        return
+      } catch (error) {
+        // 사용자가 공유 시트를 닫은 것이면 그대로 끝낸다.
+        if (error instanceof Error && error.name === 'AbortError') return
+        // 그 밖의 실패(권한·환경 문제)는 아래 클립보드로 넘어간다.
+        // 조용히 끝내면 눌렀는데 아무 일도 없는 것처럼 보인다.
       }
     }
 
