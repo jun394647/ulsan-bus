@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Arrival, ArrivalsResponse, Stop, StopRoute } from '@/lib/models'
 import { RouteBadge, RouteTypeLabel } from './RouteBadge'
+import { DEFAULT_LEAD_SECONDS, useArrivalAlerts } from '@/lib/notify'
+import { ShareButton } from './ShareButton'
 
 /** 자동 갱신 간격. 트래픽 한도(10,000회/일)와 체감 신선도의 절충값. */
 const REFRESH_MS = 30_000
@@ -64,6 +66,12 @@ export function ArrivalBoard({
   // 응답이 겹칠 수 있다. 진행 중이면 건너뛴다.
   const inFlight = useRef(false)
 
+  const alerts = useArrivalAlerts(stop.name)
+
+  // 값이 바뀔 때마다 알림 조건을 확인한다.
+  // 렌더 중에 부르면 안 되므로 갱신 직후(load)와 초기값에 대해 각각 처리한다.
+  const checkAlerts = alerts.check
+
   const load = useCallback(async (fresh = false) => {
     if (inFlight.current) return
     inFlight.current = true
@@ -79,9 +87,11 @@ export function ArrivalBoard({
         setError(data.error ?? '도착정보를 가져오지 못했습니다.')
       } else {
         // 이전 값을 지우지 않고 갈아끼운다. 갱신 중 화면이 비지 않게.
-        setArrivals(data.arrivals ?? [])
+        const next = data.arrivals ?? []
+        setArrivals(next)
         setFetchedAt(data.fetchedAt ? new Date(data.fetchedAt) : new Date())
         setError(null)
+        checkAlerts(next)
       }
     } catch {
       setError('네트워크 오류로 도착정보를 가져오지 못했습니다.')
@@ -89,7 +99,7 @@ export function ArrivalBoard({
       inFlight.current = false
       setIsRefreshing(false)
     }
-  }, [stop.nodeid])
+  }, [stop.nodeid, checkAlerts])
 
   /*
    * 첫 데이터가 캐시에서 왔으면 곧바로 실시간 값으로 갈아끼운다.
@@ -133,13 +143,16 @@ export function ArrivalBoard({
         <span className="tabular">
           {fetchedAt ? `${formatClock(fetchedAt)} 기준` : '불러오는 중…'}
         </span>
-        <button
-          onClick={() => load(true)}
-          disabled={isRefreshing}
-          className="rounded-lg px-2.5 py-1 font-medium text-[var(--color-accent)] active:bg-[var(--color-surface)] disabled:opacity-40"
-        >
-          {isRefreshing ? '갱신 중…' : '새로고침'}
-        </button>
+        <div className="flex items-center gap-1">
+          <ShareButton stop={stop} />
+          <button
+            onClick={() => load(true)}
+            disabled={isRefreshing}
+            className="rounded-lg px-2.5 py-1 font-medium text-[var(--color-accent)] active:bg-[var(--color-surface)] disabled:opacity-40"
+          >
+            {isRefreshing ? '갱신 중…' : '새로고침'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -159,9 +172,29 @@ export function ArrivalBoard({
       {arrivals.length > 0 && (
         <ul className="flex flex-col gap-2 px-4">
           {arrivals.map((arrival) => (
-            <ArrivalCard key={arrival.routeId} arrival={arrival} />
+            <ArrivalCard
+              key={arrival.routeId}
+              arrival={arrival}
+              watched={alerts.watched.has(arrival.routeId)}
+              onToggleAlert={() => alerts.toggle(arrival.routeId)}
+            />
           ))}
         </ul>
+      )}
+
+      {alerts.watched.size > 0 && (
+        <p className="mx-4 mt-3 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-xs leading-relaxed text-[var(--color-muted)]">
+          도착 {Math.round(DEFAULT_LEAD_SECONDS / 60)}분 전에 알려드립니다.
+          <br />
+          <b>이 화면을 닫으면 알림이 해제됩니다.</b> 다른 앱을 보고 있어도 괜찮지만
+          탭은 열어두세요.
+        </p>
+      )}
+
+      {alerts.permission === 'denied' && (
+        <p className="mx-4 mt-3 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-xs text-[var(--color-muted)]">
+          알림 권한이 거부되어 있습니다. 브라우저 설정에서 허용해 주세요.
+        </p>
       )}
 
       {idleRoutes.length > 0 && (
@@ -191,8 +224,18 @@ export function ArrivalBoard({
   )
 }
 
-function ArrivalCard({ arrival }: { arrival: Arrival }) {
+function ArrivalCard({
+  arrival,
+  watched,
+  onToggleAlert,
+}: {
+  arrival: Arrival
+  watched: boolean
+  onToggleAlert: () => void
+}) {
   const isUrgent = arrival.correctedSeconds < URGENT_SECONDS
+  // 이미 임박한 버스에 알림을 걸 이유가 없다.
+  const canAlert = arrival.correctedSeconds > DEFAULT_LEAD_SECONDS
 
   return (
     <li
@@ -232,11 +275,25 @@ function ArrivalCard({ arrival }: { arrival: Arrival }) {
         </div>
       </div>
 
-      <div
-        className="tabular shrink-0 text-right text-2xl font-bold"
-        style={{ color: isUrgent ? 'var(--urgent)' : 'var(--foreground)' }}
-      >
-        {formatEta(arrival.correctedSeconds)}
+      <div className="flex shrink-0 items-center gap-1">
+        <div
+          className="tabular text-right text-2xl font-bold"
+          style={{ color: isUrgent ? 'var(--urgent)' : 'var(--foreground)' }}
+        >
+          {formatEta(arrival.correctedSeconds)}
+        </div>
+
+        {(canAlert || watched) && (
+          <button
+            onClick={onToggleAlert}
+            aria-pressed={watched}
+            aria-label={watched ? '도착 알림 해제' : '도착 알림 설정'}
+            className="rounded-full p-1.5 text-lg leading-none active:bg-[var(--color-surface-strong)]"
+            style={{ color: watched ? 'var(--accent)' : 'var(--muted)' }}
+          >
+            {watched ? '🔔' : '🔕'}
+          </button>
+        )}
       </div>
     </li>
   )
