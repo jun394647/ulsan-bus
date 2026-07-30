@@ -69,7 +69,6 @@ async function ArrivalsSection({ stop }: { stop: Stop }) {
   let arrivals: Arrival[] = []
   let routes: StopRoute[] = []
   let observedAt: string | undefined
-  let fromCache = false
   let error: string | undefined
 
   // 경유노선이 실패해도 도착정보는 보여줘야 하므로 각각 독립적으로 처리한다.
@@ -81,7 +80,6 @@ async function ArrivalsSection({ stop }: { stop: Stop }) {
   if (arrivalResult.status === 'fulfilled') {
     arrivals = arrivalResult.value.arrivals
     observedAt = arrivalResult.value.observedAt.toISOString()
-    fromCache = arrivalResult.value.fromCache
   } else {
     console.error('[stop page] 도착정보', stop.nodeid, arrivalResult.reason)
     error = '도착정보를 가져오지 못했습니다. 잠시 후 새로고침해 주세요.'
@@ -113,7 +111,6 @@ async function ArrivalsSection({ stop }: { stop: Stop }) {
       stop={stop}
       initialArrivals={enriched}
       initialObservedAt={observedAt}
-      initialFromCache={fromCache}
       initialError={error}
       routes={routes}
     />

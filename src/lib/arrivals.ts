@@ -6,129 +6,34 @@ import type { Arrival } from './models'
 export type { Arrival }
 
 /**
- * 도착정보 조회.
+ * 도착정보 조회와 관측 기록.
  *
- * ── 왜 DB를 먼저 보는가
- * TAGO는 평소 90ms 안쪽으로 빠르지만 간헐적으로 4초 가까이 튄다(8회 중 2회 관측).
- * 평균이 아니라 이 꼬리가 체감 속도를 지배한다.
- *
- * 추적 중인 정류장은 수집기가 2분마다 채워 넣고 있으므로, 그 값을 쓰면
- * 77ms로 안정적으로 답할 수 있다. 관측 이후 흐른 시간만큼 arrtime을 빼면
- * 지금 시점의 예상 도착까지 남은 시간이 되므로 오래된 값도 그대로 쓸 수 있다.
- *
- * ── 부수 효과
- * 캐시가 없어 TAGO를 부르면 그 결과도 저장한다. 사용자가 자주 보는 정류장의
- * 관측이 자연히 쌓여서, 나중에 보정할 수 있는 정류장이 늘어난다.
+ * 조회 결과는 그대로 arrival_observations에 남긴다. 사용자가 자주 보는 정류장의
+ * 관측이 자연히 쌓여서, 3단계에서 보정할 수 있는 정류장이 넓어진다.
  */
 
 const ULSAN_CITY_CODE = 26
-
-/**
- * 캐시를 쓸 수 있는 최대 나이.
- *
- * 짧게 잡는 이유: 관측 시각으로부터 경과한 만큼 arrtime을 빼서 쓰지만,
- * 버스 예측은 선형이 아니다. 100초 전 "5분 후"가 지금 "2분 후"로 갱신됐을 수 있는데
- * 단순 차감은 그 갱신을 놓친다. 결과적으로 화면이 실제보다 뒤처져 보인다.
- *
- * 그래서 캐시는 "첫 화면을 즉시 띄우는 용도"로만 쓰고, 곧바로 실시간 값으로
- * 갈아끼운다(fetchFresh). 이 값은 그 즉시성의 허용 오차다.
- */
-const CACHE_MAX_AGE_SECONDS = 45
 
 export interface ArrivalsResult {
   arrivals: Arrival[]
   /** 이 값을 관측한 시각. 화면에 "몇 시 기준"으로 표시한다. */
   observedAt: Date
-  /** DB의 기존 관측을 재사용했는지 (false면 방금 API에서 받아온 것) */
-  fromCache: boolean
-}
-
-interface CachedRow {
-  route_id: string
-  route_no: string
-  arrtime: number
-  prev_stops: number
-  vehicle_type: string | null
-  observed_at: Date
 }
 
 /**
- * @param options.fresh 캐시를 건너뛰고 API에서 직접 받는다.
- *   클라이언트가 첫 화면을 띄운 직후 정확한 값으로 갱신할 때 쓴다.
+ * 도착정보 조회. 항상 API에서 직접 받는다.
+ *
+ * ── DB 캐시를 뒀다가 되돌린 이유
+ * 응답 속도를 위해 최근 관측을 재사용해 봤지만, TAGO는 약 2분마다 arrtime을
+ * 한꺼번에 갱신하고 그때 값이 크게 점프한다(1823→1453, 143→1041처럼).
+ * 그래서 45초짜리 캐시라도 실시간 값과 세대가 달라지고, 실측에서 두 값의
+ * 차이가 중앙값 14분까지 벌어졌다.
+ *
+ * 정확도가 이 프로젝트의 목표인데 속도를 위해 그걸 깎는 것은 본말전도다.
+ * TAGO는 평소 90ms 안쪽으로 응답하므로(간헐적으로 4초) 직접 조회로도 충분하다.
  */
-export async function getArrivals(
-  nodeId: string,
-  options: { fresh?: boolean } = {},
-): Promise<ArrivalsResult> {
-  if (!options.fresh) {
-    const cached = await readRecent(nodeId)
-    if (cached) return cached
-  }
-
+export async function getArrivals(nodeId: string): Promise<ArrivalsResult> {
   return fetchFresh(nodeId)
-}
-
-/** 최근 폴링 한 회차분을 읽는다. 없거나 오래됐으면 null. */
-async function readRecent(nodeId: string): Promise<ArrivalsResult | null> {
-  try {
-    const sql = getSql()
-
-    // 마지막 폴링 시각을 먼저 찾고 그 회차의 행만 가져온다.
-    // 시간 범위로 자르면 여러 회차가 섞여 같은 노선이 중복된다.
-    const rows = await sql<CachedRow[]>`
-      SELECT route_id, route_no, arrtime, prev_stops, vehicle_type, observed_at
-      FROM arrival_observations
-      WHERE node_id = ${nodeId}
-        AND observed_at = (
-          SELECT max(observed_at) FROM arrival_observations
-          WHERE node_id = ${nodeId}
-            AND observed_at > now() - make_interval(secs => ${CACHE_MAX_AGE_SECONDS})
-        )
-    `
-
-    if (rows.length === 0) return null
-
-    const observedAt = rows[0].observed_at
-
-    /*
-     * 경과 시간을 차감하지 않는다.
-     *
-     * 처음에는 "관측 후 흐른 만큼 빼면 지금 기준이 된다"고 보고 차감했다.
-     * 그런데 실측해 보니 TAGO는 약 2분마다 한 번씩만 arrtime을 갱신한다
-     * (25초 간격으로 8번 조회했을 때 123초 지점에서 전체가 한꺼번에 바뀌었다).
-     *
-     * 즉 우리가 받은 값은 이미 0~120초 낡은 상태다. TAGO가 언제 계산했는지는
-     * 알 수 없으므로, 여기서 또 빼면 이중으로 줄어들어 실제보다 짧게 표시된다.
-     * 짧게 표시하는 오류는 버스를 놓치게 만들어 길게 표시하는 것보다 나쁘다.
-     *
-     * 그래서 원본을 그대로 쓰고, 신선도는 "몇 시 기준"으로 화면에 밝힌다.
-     * 정확도는 3단계에서 실측 잔차로 보정한다 — 추측으로 깎지 않는다.
-     */
-    const arrivals = rows
-      .map((row) => {
-        const seconds = row.arrtime
-        return toArrival({
-          routeId: row.route_id,
-          routeNo: row.route_no,
-          seconds,
-          remainingStops: row.prev_stops,
-          vehicleType: row.vehicle_type ?? undefined,
-        })
-      })
-      // 관측이 낡은 동안 이미 지나갔을 버스는 뺀다.
-      // 캐시 나이(최대 45초)보다 남은 시간이 짧으면 도착했다고 본다.
-      .filter(
-        (arrival) =>
-          arrival.seconds > (Date.now() - observedAt.getTime()) / 1000 - 30,
-      )
-      .sort((a, b) => a.correctedSeconds - b.correctedSeconds)
-
-    return { arrivals, observedAt, fromCache: true }
-  } catch (error) {
-    // DB가 없거나 죽어도 앱은 동작해야 한다. API 직접 조회로 넘어간다.
-    console.error('[arrivals] 캐시 조회 실패, API로 대체합니다:', error)
-    return null
-  }
 }
 
 async function fetchFresh(nodeId: string): Promise<ArrivalsResult> {
@@ -151,7 +56,7 @@ async function fetchFresh(nodeId: string): Promise<ArrivalsResult> {
   // 저장 실패가 조회를 막지 않도록 기다리지 않는다.
   void store(nodeId, rows, observedAt)
 
-  return { arrivals, observedAt, fromCache: false }
+  return { arrivals, observedAt }
 }
 
 /** 사용자 조회로 받은 값도 관측으로 남긴다. 보정 데이터가 그만큼 늘어난다. */

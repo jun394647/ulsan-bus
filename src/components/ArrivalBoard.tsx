@@ -44,15 +44,12 @@ export function ArrivalBoard({
   stop,
   initialArrivals,
   initialObservedAt,
-  initialFromCache,
   initialError,
   routes,
 }: {
   stop: Stop
   initialArrivals: Arrival[]
   initialObservedAt?: string
-  /** 첫 데이터가 DB 캐시에서 왔는지. 그렇다면 즉시 실시간 값으로 갈아끼운다. */
-  initialFromCache?: boolean
   initialError?: string
   routes: StopRoute[]
 }) {
@@ -72,15 +69,13 @@ export function ArrivalBoard({
   // 렌더 중에 부르면 안 되므로 갱신 직후(load)와 초기값에 대해 각각 처리한다.
   const checkAlerts = alerts.check
 
-  const load = useCallback(async (fresh = false) => {
+  const load = useCallback(async () => {
     if (inFlight.current) return
     inFlight.current = true
     setIsRefreshing(true)
 
     try {
-      const response = await fetch(
-        `/api/arrivals/${stop.nodeid}${fresh ? '?fresh=1' : ''}`,
-      )
+      const response = await fetch(`/api/arrivals/${stop.nodeid}`)
       const data = (await response.json()) as ArrivalsResponse
 
       if (!response.ok || data.error) {
@@ -101,29 +96,13 @@ export function ArrivalBoard({
     }
   }, [stop.nodeid, checkAlerts])
 
-  /*
-   * 첫 데이터가 캐시에서 왔으면 곧바로 실시간 값으로 갈아끼운다.
-   *
-   * 캐시는 관측 시각에서 경과한 만큼 arrtime을 빼서 쓰는데, 버스 예측은 선형이
-   * 아니라서 그 사이의 갱신을 놓친다. 그대로 두면 다른 앱보다 1분 가까이
-   * 뒤처져 보인다. 캐시로 화면을 즉시 띄우고 정확한 값으로 덮는 편이 낫다.
-   *
-   * setTimeout으로 미루는 것은 "effect 본문에서 setState 금지" 규칙 때문이기도 하고,
-   * 첫 페인트를 막지 않으려는 의도도 있다.
-   */
-  useEffect(() => {
-    if (!initialFromCache) return
-    const timer = setTimeout(() => load(true), 0)
-    return () => clearTimeout(timer)
-  }, [initialFromCache, load])
-
   useEffect(() => {
     // 초기 데이터는 서버가 이미 줬으므로 여기서 부르지 않는다.
-    const timer = setInterval(() => load(), REFRESH_MS)
+    const timer = setInterval(load, REFRESH_MS)
 
     // 화면을 다시 보면 즉시 갱신한다. 주머니에서 꺼냈을 때 옛 정보를 보면 안 된다.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') load(true)
+      if (document.visibilityState === 'visible') load()
     }
     document.addEventListener('visibilitychange', onVisible)
 
@@ -146,7 +125,7 @@ export function ArrivalBoard({
         <div className="flex items-center gap-1">
           <ShareButton stop={stop} />
           <button
-            onClick={() => load(true)}
+            onClick={() => load()}
             disabled={isRefreshing}
             className="rounded-lg px-2.5 py-1 font-medium text-[var(--color-accent)] active:bg-[var(--color-surface)] disabled:opacity-40"
           >

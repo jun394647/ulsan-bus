@@ -39,8 +39,6 @@ export interface ArrivalsResponse {
   stop: Stop
   arrivals?: Arrival[]
   fetchedAt?: string
-  /** DB의 기존 관측을 재사용했는지. true면 최대 45초 뒤처진 값이다. */
-  fromCache?: boolean
   error?: string
 }
 
